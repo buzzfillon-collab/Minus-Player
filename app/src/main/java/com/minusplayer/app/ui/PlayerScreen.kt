@@ -188,7 +188,7 @@ fun PlayerScreen(
                         wakeControls()
                         true
                     }
-                    Key.ContextMenu -> {
+                    Key.Menu -> {
                         menuExpanded = true
                         wakeControls()
                         true
