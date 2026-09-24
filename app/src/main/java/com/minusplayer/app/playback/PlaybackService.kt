@@ -5,27 +5,37 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultRenderersFactory
-import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.common.util.UnstableApi
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderManager
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 
+@UnstableApi
 class PlaybackService : MediaSessionService() {
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
-    private val resumePrefs by lazy { getSharedPreferences("playback_resume", MODE_PRIVATE) }
+    private lateinit var decoderManager: DecoderManager
+    private lateinit var historyStore: PlaybackHistoryStore
+    private var fallbackAttemptedMediaId: String? = null
 
     override fun onCreate() {
         super.onCreate()
+        historyStore = PlaybackHistoryStore(this)
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(2_000, 50_000, 1_500, 2_000)
             .setBackBuffer(10_000, true)
             .build()
 
+        decoderManager = DecoderManager()
         val renderersFactory = NextRenderersFactory(this)
+            .setDecoderManager(decoderManager)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
 
@@ -44,22 +54,58 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
+        decoderManager.attach(player!!)
+
         player!!.addListener(object : Player.Listener {
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            override fun onPlayerError(error: PlaybackException) {
+                if (tryFfmpegFallback(error)) return
                 player?.pause()
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                if (mediaItem != null) resumePrefs.edit().putString(KEY_MEDIA_ID, mediaItem.mediaId).putLong(KEY_POSITION, 0L).apply()
+                saveResumePosition()
+                fallbackAttemptedMediaId = null
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!isPlaying) saveResumePosition()
             }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) {
+                    saveResumePosition()
+                }
+            }
         })
 
         mediaSession = MediaSession.Builder(this, player!!)
             .build()
+    }
+
+    private fun tryFfmpegFallback(error: PlaybackException): Boolean {
+        val currentPlayer = player ?: return false
+        val mediaId = currentPlayer.currentMediaItem?.mediaId ?: return false
+        if (fallbackAttemptedMediaId == mediaId) return false
+
+        val decoderFailure = error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+            error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED ||
+            error.errorCode == PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED
+
+        if (!decoderFailure) return false
+        if (decoderManager.videoMode == DecoderMode.FFMPEG &&
+            decoderManager.audioMode == DecoderMode.FFMPEG
+        ) return false
+
+        fallbackAttemptedMediaId = mediaId
+        val position = currentPlayer.currentPosition.coerceAtLeast(0L)
+        val shouldPlay = currentPlayer.playWhenReady
+        decoderManager.selectVideoDecoder(DecoderMode.FFMPEG)
+        decoderManager.selectAudioDecoder(DecoderMode.FFMPEG)
+        currentPlayer.seekTo(position)
+        currentPlayer.prepare()
+        currentPlayer.playWhenReady = shouldPlay
+        if (shouldPlay) currentPlayer.play()
+        return true
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -75,6 +121,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         saveResumePosition()
+        decoderManager.detach()
         mediaSession?.release()
         mediaSession = null
         player?.release()
@@ -84,12 +131,14 @@ class PlaybackService : MediaSessionService() {
 
     private fun saveResumePosition() {
         val currentPlayer = player ?: return
-        val mediaId = currentPlayer.currentMediaItem?.mediaId ?: return
-        resumePrefs.edit().putString(KEY_MEDIA_ID, mediaId).putLong(KEY_POSITION, currentPlayer.currentPosition.coerceAtLeast(0L)).apply()
-    }
-
-    companion object {
-        private const val KEY_MEDIA_ID = "media_id"
-        private const val KEY_POSITION = "position"
+        val mediaItem = currentPlayer.currentMediaItem ?: return
+        val mediaId = mediaItem.mediaId
+        val title = mediaItem.mediaMetadata.title?.toString().orEmpty()
+        historyStore.record(
+            mediaId = mediaId,
+            title = title,
+            positionMs = currentPlayer.currentPosition,
+            durationMs = currentPlayer.duration
+        )
     }
 }
