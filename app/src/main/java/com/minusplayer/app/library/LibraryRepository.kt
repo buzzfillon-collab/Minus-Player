@@ -19,14 +19,20 @@ class LibraryRepository(context: Context) {
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val database = LibraryDatabase(appContext)
 
-    var items by mutableStateOf<List<LibraryItem>>(emptyList())
+    var items by mutableStateOf(database.readAll())
         private set
     var isScanning by mutableStateOf(false)
         private set
     var scanError by mutableStateOf<String?>(null)
         private set
     var selectedFolders by mutableStateOf(loadFolders())
+        private set
+
+    var lastScanEpochMillis by mutableStateOf(
+        prefs.getLong(KEY_LAST_SCAN, 0L)
+    )
         private set
 
     fun scanAll() {
@@ -39,7 +45,9 @@ class LibraryRepository(context: Context) {
                 scanMediaStore(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, LibraryType.VIDEO, discovered)
                 scanMediaStore(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, LibraryType.AUDIO, discovered)
                 selectedFolders.forEach { scanTree(Uri.parse(it), discovered) }
-                publish(discovered.values.sortedBy { it.name.lowercase() })
+                val scannedItems = discovered.values.sortedBy { it.name.lowercase() }
+                database.replaceAll(scannedItems)
+                publish(scannedItems)
             } catch (t: Throwable) {
                 mainHandler.post {
                     scanError = t.message ?: "Media scan failed"
@@ -60,17 +68,16 @@ class LibraryRepository(context: Context) {
         }
         selectedFolders = (selectedFolders + value).distinct()
         saveFolders(selectedFolders)
-        scanAll()
     }
 
     fun removeFolder(treeUri: String) {
         selectedFolders = selectedFolders.filterNot { it == treeUri }
         saveFolders(selectedFolders)
-        scanAll()
     }
 
     fun shutdown() {
         executor.shutdownNow()
+        database.close()
     }
 
     private fun scanMediaStore(
@@ -183,6 +190,8 @@ class LibraryRepository(context: Context) {
     private fun publish(newItems: List<LibraryItem>) {
         mainHandler.post {
             items = newItems
+            lastScanEpochMillis = System.currentTimeMillis()
+            prefs.edit().putLong(KEY_LAST_SCAN, lastScanEpochMillis).apply()
             isScanning = false
         }
     }
@@ -197,6 +206,7 @@ class LibraryRepository(context: Context) {
     companion object {
         private const val PREFS_NAME = "media_library"
         private const val KEY_FOLDERS = "selected_folders"
+        private const val KEY_LAST_SCAN = "last_scan_epoch_millis"
         private val VIDEO_EXTENSIONS = setOf(".3gp", ".avi", ".flv", ".m2ts", ".m4v", ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".ts", ".webm", ".wmv")
         private val AUDIO_EXTENSIONS = setOf(".aac", ".alac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".opus", ".wav", ".weba", ".wma")
     }
