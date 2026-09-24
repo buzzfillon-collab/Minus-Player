@@ -64,7 +64,9 @@ fun MinusPlayerApp(
     onRefreshLibrary: () -> Unit,
     onSelectFolder: () -> Unit,
     onOpenLibraryItem: (LibraryItem) -> Unit,
-    onOpenHistoryItem: (PlaybackHistoryItem) -> Unit
+    onOpenHistoryItem: (PlaybackHistoryItem) -> Unit,
+    onOpenSubtitleFile: () -> Unit = {},
+    onSubtitleDownloaded: (android.net.Uri, String?, String?) -> Unit = { _, _, _ -> }
 ) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
 
@@ -106,6 +108,8 @@ fun MinusPlayerApp(
                         onOpenMedia = onOpenMedia,
                         onOpenHistoryItem = onOpenHistoryItem,
                         onToggleFullscreen = onToggleFullscreen,
+                        onOpenSubtitleFile = onOpenSubtitleFile,
+                        onSubtitleDownloaded = onSubtitleDownloaded,
                         modifier = Modifier.fillMaxSize()
                     )
 
@@ -151,6 +155,8 @@ private fun HomeScreen(
     onOpenMedia: () -> Unit,
     onOpenHistoryItem: (PlaybackHistoryItem) -> Unit,
     onToggleFullscreen: () -> Unit,
+    onOpenSubtitleFile: () -> Unit,
+    onSubtitleDownloaded: (android.net.Uri, String?, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var refreshTick by remember { mutableIntStateOf(0) }
@@ -168,7 +174,9 @@ private fun HomeScreen(
         PlayerScreen(
             player = player,
             modifier = Modifier.fillMaxSize(),
-            onToggleFullscreen = onToggleFullscreen
+            onToggleFullscreen = onToggleFullscreen,
+            onOpenSubtitleFile = onOpenSubtitleFile,
+            onSubtitleDownloaded = onSubtitleDownloaded
         )
 
         Row(
