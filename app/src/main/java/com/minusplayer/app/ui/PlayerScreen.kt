@@ -76,6 +76,7 @@ fun PlayerScreen(
     var menuExpanded by remember { mutableStateOf(false) }
     var interactionTick by remember { mutableIntStateOf(0) }
     var volume by remember(player) { mutableFloatStateOf(player?.volume ?: 1f) }
+    var playbackError by remember(player) { mutableStateOf<androidx.media3.common.PlaybackException?>(null) }
 
     val focusRequester = remember { FocusRequester() }
 
@@ -95,6 +96,11 @@ fun PlayerScreen(
                     bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
                     isPlaying = player.isPlaying
                     volume = player.volume
+                    if (events.contains(Player.EVENT_PLAYER_ERROR)) {
+                        playbackError = player.playerError
+                    } else if (player.playerError == null) {
+                        playbackError = null
+                    }
                 }
             }
             player.addListener(listener)
@@ -109,12 +115,13 @@ fun PlayerScreen(
             bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
             isPlaying = player.isPlaying
             volume = player.volume
+            playbackError = player.playerError
             delay(250L)
         }
     }
 
     LaunchedEffect(player, isPlaying, interactionTick) {
-        if (player != null && isPlaying) {
+        if (player != null && isPlaying && playbackError == null) {
             delay(3000L)
             controlsVisible = false
         }
@@ -220,7 +227,20 @@ fun PlayerScreen(
             )
         }
 
-        if (controlsVisible && player != null) {
+        if (playbackError != null && player != null) {
+            PlaybackErrorOverlay(
+                error = playbackError!!,
+                onRetry = {
+                    playbackError = null
+                    player.prepare()
+                    player.play()
+                    wakeControls()
+                },
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
+        if (controlsVisible && player != null && playbackError == null) {
             PlayerOverlayControls(
                 player = player,
                 position = position,
@@ -310,6 +330,54 @@ fun PlayerScreen(
         }
     }
 }
+
+@Composable
+private fun PlaybackErrorOverlay(
+    error: androidx.media3.common.PlaybackException,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.padding(24.dp),
+        color = Color(0xEE111111),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                "Playback failed",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(Modifier.size(8.dp))
+            Text(
+                playbackErrorMessage(error),
+                color = Color.LightGray,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.size(16.dp))
+            androidx.compose.material3.Button(onClick = onRetry) {
+                Text("Retry")
+            }
+        }
+    }
+}
+
+private fun playbackErrorMessage(error: androidx.media3.common.PlaybackException): String =
+    when (error.errorCode) {
+        androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ->
+            "The device could not initialize a decoder for this media."
+        androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ->
+            "The media decoder failed while playing this file."
+        androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ->
+            "The media container appears to be invalid or unsupported."
+        androidx.media3.common.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
+            "The media file could not be found."
+        else ->
+            error.message?.takeIf { it.isNotBlank() } ?: "The media could not be played."
+    }
 
 @Composable
 private fun PlayerOverlayControls(
