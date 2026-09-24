@@ -323,6 +323,9 @@ private fun PlayerOverlayControls(
     onToggleFullscreen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var scrubPosition by remember(player) { mutableFloatStateOf(position.toFloat()) }
+    var scrubbing by remember(player) { mutableStateOf(false) }
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -336,7 +339,7 @@ private fun PlayerOverlayControls(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    formatTime(position),
+                    formatTime(if (scrubbing) scrubPosition.toLong() else position),
                     color = Color.White,
                     style = MaterialTheme.typography.labelMedium
                 )
@@ -354,8 +357,14 @@ private fun PlayerOverlayControls(
                         Slider(
                             value = position.toFloat().coerceIn(0f, duration.toFloat()),
                             onValueChange = {
+                                scrubbing = true
+                                scrubPosition = it
                                 onInteraction()
-                                player.seekTo(it.toLong())
+                            },
+                            onValueChangeFinished = {
+                                player.seekTo(scrubPosition.toLong())
+                                scrubbing = false
+                                onInteraction()
                             },
                             valueRange = 0f..duration.toFloat(),
                             modifier = Modifier.fillMaxWidth(),
