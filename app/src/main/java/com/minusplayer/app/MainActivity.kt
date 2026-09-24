@@ -32,8 +32,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var libraryRepository: LibraryRepository
     private var mediaController by mutableStateOf<MediaController?>(null)
     private var fullscreen = false
-    private var pendingResumeUri: Uri? = null
-    private var pendingResumePosition: Long = 0L
 
     private val openMediaLauncher =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -44,10 +42,7 @@ class MainActivity : ComponentActivity() {
             )
             mediaController?.let { controller ->
                 playbackController.setMediaItem(controller, uri)
-                controller.seekTo(pendingResumePosition)
                 controller.play()
-                pendingResumeUri = null
-                pendingResumePosition = 0L
             }
         }
 
@@ -92,7 +87,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val requestMediaPermissions =
+    private val requestMediaPermissionsForOpen =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+            if (grants.values.all { it }) openMediaPicker()
+        }
+
+    private val requestMediaPermissionsForLibrary =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             if (grants.values.all { it }) libraryRepository.scanAll()
         }
@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
         if (permissions.isEmpty() || permissions.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) {
             openMediaPicker()
         } else {
-            requestMediaPermissions.launch(permissions)
+            requestMediaPermissionsForOpen.launch(permissions)
         }
     }
 
@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
         if (permissions.isEmpty() || permissions.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) {
             libraryRepository.scanAll()
         } else {
-            requestMediaPermissions.launch(permissions)
+            requestMediaPermissionsForLibrary.launch(permissions)
         }
     }
 
