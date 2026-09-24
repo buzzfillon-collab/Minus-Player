@@ -14,16 +14,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.session.MediaController
 import com.minusplayer.app.playback.PlaybackController
 import com.minusplayer.app.ui.MinusPlayerApp
-import com.minusplayer.app.ui.PlayerScreen
 import com.minusplayer.app.ui.theme.MinusPlayerTheme
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var playbackController: PlaybackController
     private var mediaController by mutableStateOf<MediaController?>(null)
+    private var fullscreen = false
 
     private val openMediaLauncher =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -40,6 +43,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        WindowCompat.setDecorFitsSystemWindows(window, true)
 
         playbackController = PlaybackController(this)
         playbackController.controllerFuture.addListener(
@@ -58,16 +63,26 @@ class MainActivity : ComponentActivity() {
                     MinusPlayerApp(
                         onOpenMedia = {
                             openMediaLauncher.launch(
-                                arrayOf(
-                                    "video/*",
-                                    "audio/*"
-                                )
+                                arrayOf("video/*", "audio/*")
                             )
                         },
-                        player = mediaController
+                        player = mediaController,
+                        onToggleFullscreen = ::toggleFullscreen
                     )
                 }
             }
+        }
+    }
+
+    private fun toggleFullscreen() {
+        fullscreen = !fullscreen
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        if (fullscreen) {
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
