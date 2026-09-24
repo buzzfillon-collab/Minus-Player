@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Movie
@@ -23,9 +25,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -44,9 +51,18 @@ fun LibraryScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val visibleItems = filter?.let { type ->
+    var searchQuery by rememberSaveable(filter) { mutableStateOf("") }
+
+    val filteredItems = filter?.let { type ->
         repository.items.filter { it.type == type }
     } ?: repository.items
+
+    val visibleItems = if (searchQuery.isBlank()) {
+        filteredItems
+    } else {
+        val query = searchQuery.trim()
+        filteredItems.filter { it.name.contains(query, ignoreCase = true) }
+    }
 
     androidx.compose.material3.pulltorefresh.PullToRefreshBox(
         modifier = modifier.fillMaxSize(),
@@ -74,7 +90,11 @@ fun LibraryScreen(
                             style = MaterialTheme.typography.headlineSmall
                         )
                         Text(
-                            "${visibleItems.size} items",
+                            if (searchQuery.isBlank()) {
+                                visibleItems.size.toString() + " items"
+                            } else {
+                                visibleItems.size.toString() + " of " + filteredItems.size + " items"
+                            },
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -88,6 +108,30 @@ fun LibraryScreen(
                         Icon(Icons.Default.FolderOpen, "Add folder")
                     }
                 }
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 4.dp),
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, "Clear search")
+                            }
+                        }
+                    },
+                    placeholder = {
+                        Text(
+                            "Search " + if (filter == LibraryType.AUDIO) "music" else "videos"
+                        )
+                    }
+                )
 
                 repository.scanError?.let {
                     Text(
@@ -115,12 +159,20 @@ fun LibraryScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("No media found")
+                            Text(
+                                if (searchQuery.isBlank()) "No media found" else "No matching media"
+                            )
                             Spacer(Modifier.size(12.dp))
-                            Button(onClick = onSelectFolder) {
-                                Icon(Icons.Default.FolderOpen, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Select a folder")
+                            if (searchQuery.isBlank()) {
+                                Button(onClick = onSelectFolder) {
+                                    Icon(Icons.Default.FolderOpen, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Select a folder")
+                                }
+                            } else {
+                                Button(onClick = { searchQuery = "" }) {
+                                    Text("Clear search")
+                                }
                             }
                         }
                     }
