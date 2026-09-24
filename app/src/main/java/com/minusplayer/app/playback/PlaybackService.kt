@@ -7,8 +7,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.common.util.UnstableApi
@@ -64,6 +64,10 @@ class PlaybackService : MediaSessionService() {
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 saveResumePosition()
+                // DecoderManager choices persist across media items. Return to AUTO for
+                // every new item so hardware acceleration remains the default path.
+                decoderManager.selectVideoDecoder(DecoderMode.AUTO)
+                decoderManager.selectAudioDecoder(DecoderMode.AUTO)
                 fallbackAttemptedMediaId = null
             }
 
@@ -99,6 +103,10 @@ class PlaybackService : MediaSessionService() {
         fallbackAttemptedMediaId = mediaId
         val position = currentPlayer.currentPosition.coerceAtLeast(0L)
         val shouldPlay = currentPlayer.playWhenReady
+
+        // NextLib's FFmpeg renderer is the compatibility escape hatch for formats that
+        // MediaCodec cannot initialize/decode. The manager switches without replacing
+        // the player, preserving playlist, position and playWhenReady.
         decoderManager.selectVideoDecoder(DecoderMode.FFMPEG)
         decoderManager.selectAudioDecoder(DecoderMode.FFMPEG)
         currentPlayer.seekTo(position)
