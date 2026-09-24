@@ -32,6 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
+import com.minusplayer.app.library.LibraryItem
+import com.minusplayer.app.library.LibraryRepository
+import com.minusplayer.app.library.LibraryType
 
 private data class Destination(
     val label: String,
@@ -50,14 +53,15 @@ private val destinations = listOf(
 fun MinusPlayerApp(
     onOpenMedia: () -> Unit,
     player: Player?,
-    onToggleFullscreen: () -> Unit = {}
+    onToggleFullscreen: () -> Unit = {},
+    libraryRepository: LibraryRepository,
+    onScanLibrary: () -> Unit,
+    onSelectFolder: () -> Unit,
+    onOpenLibraryItem: (LibraryItem) -> Unit
 ) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color.Black
-    ) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
         Row(Modifier.fillMaxSize()) {
             if (selected != 0) {
                 Column(
@@ -76,7 +80,10 @@ fun MinusPlayerApp(
                     )
                     destinations.drop(1).forEachIndexed { index, destination ->
                         TextButton(
-                            onClick = { selected = index + 1 },
+                            onClick = {
+                                selected = index + 1
+                                if (selected == 1 || selected == 2) onScanLibrary()
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(destination.icon, null)
@@ -88,21 +95,52 @@ fun MinusPlayerApp(
             }
 
             Box(Modifier.weight(1f).fillMaxSize()) {
-                PlayerScreen(
-                    player = player,
-                    modifier = Modifier.fillMaxSize(),
-                    onToggleFullscreen = onToggleFullscreen
-                )
+                when (selected) {
+                    0 -> {
+                        PlayerScreen(
+                            player = player,
+                            modifier = Modifier.fillMaxSize(),
+                            onToggleFullscreen = onToggleFullscreen
+                        )
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            IconButton(onClick = onOpenMedia) {
+                                Icon(Icons.Default.FolderOpen, "Open media", tint = Color.White)
+                            }
+                        }
+                    }
 
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    IconButton(onClick = onOpenMedia) {
-                        Icon(Icons.Default.FolderOpen, "Open media", tint = Color.White)
+                    1 -> LibraryScreen(
+                        repository = libraryRepository,
+                        filter = LibraryType.VIDEO,
+                        onOpenItem = onOpenLibraryItem,
+                        onSelectFolder = onSelectFolder,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    2 -> LibraryScreen(
+                        repository = libraryRepository,
+                        filter = LibraryType.AUDIO,
+                        onOpenItem = onOpenLibraryItem,
+                        onSelectFolder = onSelectFolder,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    3 -> FolderScreen(
+                        repository = libraryRepository,
+                        onSelectFolder = onSelectFolder,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    else -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Settings", color = Color.White)
+                        }
                     }
                 }
             }
