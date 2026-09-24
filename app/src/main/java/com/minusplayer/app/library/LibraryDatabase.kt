@@ -1,6 +1,5 @@
 package com.minusplayer.app.library
 
-import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
@@ -93,7 +92,7 @@ class LibraryDatabase(context: Context) : SQLiteOpenHelper(
                 statement.bindLong(4, item.sizeBytes)
                 statement.bindLong(5, item.durationMs)
                 statement.bindLong(6, item.modifiedEpochSeconds)
-                statement.bindLong(7, if (item.type == LibraryType.VIDEO) TYPE_VIDEO else TYPE_AUDIO)
+                statement.bindLong(7, if (item.type == LibraryType.VIDEO) TYPE_VIDEO.toLong() else TYPE_AUDIO.toLong())
                 statement.executeInsert()
             }
 
