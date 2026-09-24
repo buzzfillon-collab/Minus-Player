@@ -55,7 +55,7 @@ fun MinusPlayerApp(
     player: Player?,
     onToggleFullscreen: () -> Unit = {},
     libraryRepository: LibraryRepository,
-    onScanLibrary: () -> Unit,
+    onRefreshLibrary: () -> Unit,
     onSelectFolder: () -> Unit,
     onOpenLibraryItem: (LibraryItem) -> Unit
 ) {
@@ -82,7 +82,6 @@ fun MinusPlayerApp(
                         TextButton(
                             onClick = {
                                 selected = index + 1
-                                if (selected == 1 || selected == 2) onScanLibrary()
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -120,6 +119,7 @@ fun MinusPlayerApp(
                         filter = LibraryType.VIDEO,
                         onOpenItem = onOpenLibraryItem,
                         onSelectFolder = onSelectFolder,
+                        onRefresh = onRefreshLibrary,
                         modifier = Modifier.fillMaxSize()
                     )
 
