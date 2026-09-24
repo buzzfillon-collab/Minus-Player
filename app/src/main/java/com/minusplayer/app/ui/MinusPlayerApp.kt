@@ -128,6 +128,7 @@ fun MinusPlayerApp(
                         filter = LibraryType.AUDIO,
                         onOpenItem = onOpenLibraryItem,
                         onSelectFolder = onSelectFolder,
+                        onRefresh = onRefreshLibrary,
                         modifier = Modifier.fillMaxSize()
                     )
 
