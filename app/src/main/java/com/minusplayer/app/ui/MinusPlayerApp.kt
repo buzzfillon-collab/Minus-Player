@@ -20,6 +20,7 @@ import androidx.compose.runtime.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.Player
 
 private data class Destination(
     val label: String,
@@ -35,7 +36,10 @@ private val destinations = listOf(
 )
 
 @Composable
-fun MinusPlayerApp() {
+fun MinusPlayerApp(
+    onOpenMedia: () -> Unit,
+    player: Player?
+) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
 
     Row(modifier = Modifier.fillMaxSize()) {
@@ -51,29 +55,39 @@ fun MinusPlayerApp() {
             }
         }
 
-        MediaHome(
-            destination = destinations[selected].label,
-            modifier = Modifier
-                .weight(1f)
-                .padding(24.dp)
-        )
+        if (selected == 0) {
+            MediaHome(
+                onOpenMedia = onOpenMedia,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(24.dp)
+            )
+        } else {
+            MediaHome(
+                onOpenMedia = onOpenMedia,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(24.dp)
+            )
+        }
     }
 }
 
 @Composable
 private fun MediaHome(
-    destination: String,
+    onOpenMedia: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     androidx.compose.foundation.layout.Column(modifier = modifier) {
         Text(
-            text = destination,
+            text = "Minus Player",
             style = androidx.compose.material3.MaterialTheme.typography.headlineLarge
         )
-        Text(
-            text = "Minus Player foundation",
-            modifier = Modifier.padding(top = 8.dp),
-            style = androidx.compose.material3.MaterialTheme.typography.bodyLarge
-        )
+        androidx.compose.material3.Button(
+            onClick = onOpenMedia,
+            modifier = Modifier.padding(top = 16.dp)
+        ) {
+            Text("Open media")
+        }
     }
 }
