@@ -23,6 +23,7 @@ import com.minusplayer.app.library.LibraryRepository
 import com.minusplayer.app.library.LibraryItem
 import com.minusplayer.app.permissions.PermissionManager
 import com.minusplayer.app.playback.PlaybackController
+import com.minusplayer.app.playback.PlaybackHistoryStore
 import com.minusplayer.app.ui.MinusPlayerApp
 import com.minusplayer.app.ui.theme.MinusPlayerTheme
 
@@ -30,6 +31,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var playbackController: PlaybackController
     private lateinit var libraryRepository: LibraryRepository
+    private lateinit var historyStore: PlaybackHistoryStore
     private var mediaController by mutableStateOf<MediaController?>(null)
     private var fullscreen = false
 
@@ -57,7 +59,8 @@ class MainActivity : ComponentActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
-        playbackController = PlaybackController(this)
+        historyStore = PlaybackHistoryStore(this)
+        playbackController = PlaybackController(this, historyStore)
         libraryRepository = LibraryRepository(this)
 
         playbackController.controllerFuture.addListener(
@@ -78,9 +81,11 @@ class MainActivity : ComponentActivity() {
                         player = mediaController,
                         onToggleFullscreen = ::toggleFullscreen,
                         libraryRepository = libraryRepository,
+                        historyStore = historyStore,
                         onRefreshLibrary = ::scanLibraryWithPermission,
                         onSelectFolder = ::selectFolder,
-                        onOpenLibraryItem = ::openLibraryItem
+                        onOpenLibraryItem = ::openLibraryItem,
+                        onOpenHistoryItem = ::openHistoryItem
                     )
                 }
             }
@@ -125,7 +130,14 @@ class MainActivity : ComponentActivity() {
 
     private fun openLibraryItem(item: LibraryItem) {
         mediaController?.let { controller ->
-            playbackController.setMediaItem(controller, item.uri)
+            playbackController.setMediaItem(controller, item.uri, item.name)
+            controller.play()
+        }
+    }
+
+    private fun openHistoryItem(item: com.minusplayer.app.playback.PlaybackHistoryItem) {
+        mediaController?.let { controller ->
+            playbackController.setMediaItem(controller, item.uri, item.title)
             controller.play()
         }
     }
