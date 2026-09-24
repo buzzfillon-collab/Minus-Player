@@ -28,7 +28,7 @@ jobs:
       - name: Install Android 17 SDK
         run: |
           sdkmanager --channel=1 --install \
-            "platforms;android-37" \
+            "platforms;android-37.0" \
             "build-tools;37.0.0"
 
       - name: Set up Gradle
