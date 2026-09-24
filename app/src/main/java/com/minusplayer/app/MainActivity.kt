@@ -61,17 +61,30 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     MinusPlayerApp(
-                        onOpenMedia = {
-                            openMediaLauncher.launch(
-                                arrayOf("video/*", "audio/*")
-                            )
-                        },
+                        onOpenMedia = ::openMediaWithPermission,
                         player = mediaController,
                         onToggleFullscreen = ::toggleFullscreen
                     )
                 }
             }
         }
+    }
+
+    private val requestMediaPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        if (grants.values.all { it }) openMediaPicker()
+    }
+
+    private fun openMediaWithPermission() {
+        val permissions = PermissionManager.mediaPermissions()
+        if (permissions.isEmpty() || permissions.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) {
+            openMediaPicker()
+        } else {
+            requestMediaPermissions.launch(permissions)
+        }
+    }
+
+    private fun openMediaPicker() {
+        openMediaLauncher.launch(arrayOf("video/*", "audio/*"))
     }
 
     private fun toggleFullscreen() {
