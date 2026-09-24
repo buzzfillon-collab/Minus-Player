@@ -3,6 +3,7 @@ package com.minusplayer.app.playback
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -27,7 +28,9 @@ class PlaybackController(
         val displayTitle = title?.takeIf { it.isNotBlank() }
             ?: uri.lastPathSegment?.substringAfterLast('/')?.ifBlank { null }
             ?: uri.toString()
-        val mediaItem = MediaItem.Builder()
+
+        val mimeType = resolveMimeType(uri)
+        val builder = MediaItem.Builder()
             .setUri(uri)
             .setMediaId(uri.toString())
             .setMediaMetadata(
@@ -35,9 +38,39 @@ class PlaybackController(
                     .setTitle(displayTitle)
                     .build()
             )
-            .build()
-        controller.setMediaItem(mediaItem, historyStore.getResumePosition(uri.toString()))
+
+        if (mimeType != null) {
+            builder.setMimeType(mimeType)
+        }
+
+        controller.setMediaItem(
+            builder.build(),
+            historyStore.getResumePosition(uri.toString())
+        )
         controller.prepare()
+    }
+
+    private fun resolveMimeType(uri: Uri): String? {
+        val resolverType = applicationContext.contentResolver.getType(uri)
+            ?.takeUnless { it.equals("application/octet-stream", ignoreCase = true) }
+        if (resolverType != null) return resolverType
+
+        val extension = MimeTypeMap.getFileExtensionFromUrl(uri.toString())
+            .trim()
+            .lowercase()
+        return extension.takeIf { it.isNotEmpty() }?.let {
+            MimeTypeMap.getSingleton().getMimeTypeFromExtension(it)
+        } ?: when (extension) {
+            "mkv" -> "video/x-matroska"
+            "m2ts" -> "video/mp2t"
+            "ts" -> "video/mp2t"
+            "avi" -> "video/x-msvideo"
+            "flv" -> "video/x-flv"
+            "ogm" -> "video/ogg"
+            "wma" -> "audio/x-ms-wma"
+            "weba" -> "audio/webm"
+            else -> null
+        }
     }
 
     fun retry(controller: MediaController) {
