@@ -43,61 +43,88 @@ fun LibraryScreen(
     onSelectFolder: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val visibleItems = filter?.let { type -> repository.items.filter { it.type == type } } ?: repository.items
+    val visibleItems = filter?.let { type ->
+        repository.items.filter { it.type == type }
+    } ?: repository.items
 
-    Column(modifier.fillMaxSize().padding(24.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    when (filter) {
-                        LibraryType.VIDEO -> "Videos"
-                        LibraryType.AUDIO -> "Music"
-                        null -> "Library"
-                    },
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text("${visibleItems.size} items", style = MaterialTheme.typography.bodyMedium)
-            }
-            IconButton(onClick = repository::scanAll) {
-                Icon(Icons.Default.Refresh, "Rescan")
-            }
-            IconButton(onClick = onSelectFolder) {
-                Icon(Icons.Default.FolderOpen, "Add folder")
-            }
-        }
-
-        if (repository.isScanning) {
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircularProgressIndicator(Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Scanning media…")
-            }
-        }
-
-        repository.scanError?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp))
-        }
-
-        if (visibleItems.isEmpty() && !repository.isScanning) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No media found")
-                    Spacer(Modifier.size(12.dp))
-                    Button(onClick = onSelectFolder) {
-                        Icon(Icons.Default.FolderOpen, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Select a folder")
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        modifier = modifier.fillMaxSize(),
+        isRefreshing = repository.isScanning,
+        onRefresh = repository::scanAll
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            item {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            when (filter) {
+                                LibraryType.VIDEO -> "Videos"
+                                LibraryType.AUDIO -> "Music"
+                                null -> "Library"
+                            },
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        Text(
+                            "${visibleItems.size} items",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    IconButton(
+                        onClick = repository::scanAll,
+                        enabled = !repository.isScanning
+                    ) {
+                        Icon(Icons.Default.Refresh, "Rescan library")
+                    }
+                    IconButton(onClick = onSelectFolder) {
+                        Icon(Icons.Default.FolderOpen, "Add folder")
                     }
                 }
+
+                repository.scanError?.let {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                    )
+                }
+
+                if (repository.lastScanEpochMillis > 0L) {
+                    Text(
+                        "Last scanned: ${formatLastScan(repository.lastScanEpochMillis)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+                    )
+                }
             }
-        } else {
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
+
+            if (visibleItems.isEmpty() && !repository.isScanning) {
+                item {
+                    Box(
+                        Modifier
+                            .fillParentMaxHeight(0.75f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("No media found")
+                            Spacer(Modifier.size(12.dp))
+                            Button(onClick = onSelectFolder) {
+                                Icon(Icons.Default.FolderOpen, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Select a folder")
+                            }
+                        }
+                    }
+                }
+            } else {
                 items(visibleItems, key = { it.uri.toString() }) { item ->
                     LibraryItemRow(item, onOpenItem)
                 }
@@ -105,6 +132,7 @@ fun LibraryScreen(
         }
     }
 }
+
 
 @Composable
 private fun LibraryItemRow(item: LibraryItem, onOpenItem: (LibraryItem) -> Unit) {
@@ -203,3 +231,10 @@ private fun folderDisplayName(treeUri: String): String {
         documentId.substringAfter(':', documentId)
     }.getOrDefault(treeUri)
 }
+
+
+private fun formatLastScan(epochMillis: Long): String =
+    java.text.DateFormat.getDateTimeInstance(
+        java.text.DateFormat.SHORT,
+        java.text.DateFormat.SHORT
+    ).format(java.util.Date(epochMillis))
