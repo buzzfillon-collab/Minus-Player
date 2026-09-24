@@ -1,6 +1,7 @@
 package com.minusplayer.app.playback
 
 import android.content.Intent
+import android.net.Uri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -13,6 +14,7 @@ import androidx.media3.session.MediaSessionService
 class PlaybackService : MediaSessionService() {
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
+    private val resumePrefs by lazy { getSharedPreferences("playback_resume", MODE_PRIVATE) }
 
     override fun onCreate() {
         super.onCreate()
@@ -38,14 +40,19 @@ class PlaybackService : MediaSessionService() {
 
         player!!.addListener(object : Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                // Keep the player/session alive. The UI can observe the same Player
-                // and present a useful error without the service crashing.
                 player?.pause()
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                if (mediaItem != null) resumePrefs.edit().putString(KEY_MEDIA_ID, mediaItem.mediaId).putLong(KEY_POSITION, 0L).apply()
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (!isPlaying) saveResumePosition()
             }
         })
 
         mediaSession = MediaSession.Builder(this, player!!)
-            .setCallback(PlaybackSessionCallback())
             .build()
     }
 
@@ -61,6 +68,7 @@ class PlaybackService : MediaSessionService() {
         mediaSession
 
     override fun onDestroy() {
+        saveResumePosition()
         mediaSession?.release()
         mediaSession = null
         player?.release()
@@ -68,5 +76,14 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
-    private class PlaybackSessionCallback : MediaSession.Callback
+    private fun saveResumePosition() {
+        val currentPlayer = player ?: return
+        val mediaId = currentPlayer.currentMediaItem?.mediaId ?: return
+        resumePrefs.edit().putString(KEY_MEDIA_ID, mediaId).putLong(KEY_POSITION, currentPlayer.currentPosition.coerceAtLeast(0L)).apply()
+    }
+
+    companion object {
+        private const val KEY_MEDIA_ID = "media_id"
+        private const val KEY_POSITION = "position"
+    }
 }
