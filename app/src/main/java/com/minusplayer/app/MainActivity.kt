@@ -3,6 +3,7 @@ package com.minusplayer.app
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +28,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var playbackController: PlaybackController
     private var mediaController by mutableStateOf<MediaController?>(null)
     private var fullscreen = false
+    private var pendingResumeUri: Uri? = null
+    private var pendingResumePosition: Long = 0L
 
     private val openMediaLauncher =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -37,7 +40,10 @@ class MainActivity : ComponentActivity() {
             )
             mediaController?.let { controller ->
                 playbackController.setMediaItem(controller, uri)
+                controller.seekTo(pendingResumePosition)
                 controller.play()
+                pendingResumeUri = null
+                pendingResumePosition = 0L
             }
         }
 
@@ -97,6 +103,10 @@ class MainActivity : ComponentActivity() {
         } else {
             controller.show(WindowInsetsCompat.Type.systemBars())
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
     }
 
     override fun onDestroy() {
