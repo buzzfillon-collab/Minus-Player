@@ -19,6 +19,9 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.session.MediaController
+import com.minusplayer.app.library.LibraryRepository
+import com.minusplayer.app.library.LibraryItem
+import com.minusplayer.app.permissions.PermissionManager
 import com.minusplayer.app.playback.PlaybackController
 import com.minusplayer.app.ui.MinusPlayerApp
 import com.minusplayer.app.ui.theme.MinusPlayerTheme
@@ -26,6 +29,7 @@ import com.minusplayer.app.ui.theme.MinusPlayerTheme
 class MainActivity : ComponentActivity() {
 
     private lateinit var playbackController: PlaybackController
+    private lateinit var libraryRepository: LibraryRepository
     private var mediaController by mutableStateOf<MediaController?>(null)
     private var fullscreen = false
     private var pendingResumeUri: Uri? = null
@@ -47,12 +51,20 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    private val selectFolderLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+            uri ?: return@registerForActivityResult
+            libraryRepository.addFolder(uri)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
         playbackController = PlaybackController(this)
+        libraryRepository = LibraryRepository(this)
+
         playbackController.controllerFuture.addListener(
             {
                 mediaController = playbackController.controllerFuture.get()
@@ -69,16 +81,21 @@ class MainActivity : ComponentActivity() {
                     MinusPlayerApp(
                         onOpenMedia = ::openMediaWithPermission,
                         player = mediaController,
-                        onToggleFullscreen = ::toggleFullscreen
+                        onToggleFullscreen = ::toggleFullscreen,
+                        libraryRepository = libraryRepository,
+                        onScanLibrary = ::scanLibraryWithPermission,
+                        onSelectFolder = ::selectFolder,
+                        onOpenLibraryItem = ::openLibraryItem
                     )
                 }
             }
         }
     }
 
-    private val requestMediaPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
-        if (grants.values.all { it }) openMediaPicker()
-    }
+    private val requestMediaPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+            if (grants.values.all { it }) libraryRepository.scanAll()
+        }
 
     private fun openMediaWithPermission() {
         val permissions = PermissionManager.mediaPermissions()
@@ -89,8 +106,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun scanLibraryWithPermission() {
+        val permissions = PermissionManager.mediaPermissions()
+        if (permissions.isEmpty() || permissions.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) {
+            libraryRepository.scanAll()
+        } else {
+            requestMediaPermissions.launch(permissions)
+        }
+    }
+
     private fun openMediaPicker() {
         openMediaLauncher.launch(arrayOf("video/*", "audio/*"))
+    }
+
+    private fun selectFolder() {
+        selectFolderLauncher.launch(null)
+    }
+
+    private fun openLibraryItem(item: LibraryItem) {
+        mediaController?.let { controller ->
+            playbackController.setMediaItem(controller, item.uri)
+            controller.play()
+        }
     }
 
     private fun toggleFullscreen() {
@@ -105,13 +142,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onStop() {
-        super.onStop()
-    }
-
     override fun onDestroy() {
         mediaController = null
         playbackController.release()
+        libraryRepository.shutdown()
         super.onDestroy()
     }
 }
