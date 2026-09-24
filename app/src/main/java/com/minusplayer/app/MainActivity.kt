@@ -78,7 +78,7 @@ class MainActivity : ComponentActivity() {
                         player = mediaController,
                         onToggleFullscreen = ::toggleFullscreen,
                         libraryRepository = libraryRepository,
-                        onScanLibrary = ::scanLibraryWithPermission,
+                        onRefreshLibrary = ::scanLibraryWithPermission,
                         onSelectFolder = ::selectFolder,
                         onOpenLibraryItem = ::openLibraryItem
                     )
