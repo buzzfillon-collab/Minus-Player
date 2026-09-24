@@ -32,6 +32,17 @@ android {
         buildConfig = true
     }
 
+    val openSubtitlesApiKey = providers.gradleProperty("OPEN_SUBTITLES_API_KEY")
+        .orElse(providers.environmentVariable("OPEN_SUBTITLES_API_KEY"))
+        .orElse("")
+        .get()
+        .replace("\\", "\\\\")
+        .replace(""", "\\"")
+
+    defaultConfig {
+        buildConfigField("String", "OPEN_SUBTITLES_API_KEY", ""$openSubtitlesApiKey"")
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
