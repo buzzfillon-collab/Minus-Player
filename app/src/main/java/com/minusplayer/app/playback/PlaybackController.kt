@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -21,6 +22,12 @@ class PlaybackController(context: Context) {
     fun setMediaItem(controller: MediaController, uri: Uri) {
         controller.setMediaItem(MediaItem.fromUri(uri))
         controller.prepare()
+    }
+
+    fun seekBy(controller: Player, offsetMs: Long) {
+        controller.seekTo(
+            (controller.currentPosition + offsetMs).coerceAtLeast(0L)
+        )
     }
 
     fun release() {
