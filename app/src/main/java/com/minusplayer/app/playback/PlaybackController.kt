@@ -20,8 +20,13 @@ class PlaybackController(context: Context) {
         MediaController.Builder(applicationContext, sessionToken).buildAsync()
 
     fun setMediaItem(controller: MediaController, uri: Uri) {
-        controller.setMediaItem(MediaItem.fromUri(uri))
+        controller.setMediaItem(MediaItem.Builder().setUri(uri).setMediaId(uri.toString()).build())
         controller.prepare()
+    }
+
+    fun retry(controller: MediaController) {
+        controller.prepare()
+        controller.play()
     }
 
     fun seekBy(controller: Player, offsetMs: Long) {
