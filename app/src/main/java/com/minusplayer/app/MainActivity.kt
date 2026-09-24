@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
             mediaController?.let { controller ->
-                playbackController.addExternalSubtitle(controller, uri)
+                playbackController.addExternalSubtitle(controller, uri, "en", "English")
             }
         }
 
@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openSubtitleFile() {
-        openSubtitleLauncher.launch(arrayOf("text/*", "application/x-subrip", "text/vtt"))
+        openSubtitleLauncher.launch(arrayOf("*/*"))
     }
 
     private fun onSubtitleDownloaded(uri: Uri, language: String?, label: String?) {
