@@ -48,6 +48,18 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    private val openSubtitleLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            uri ?: return@registerForActivityResult
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            mediaController?.let { controller ->
+                playbackController.addExternalSubtitle(controller, uri)
+            }
+        }
+
     private val selectFolderLauncher =
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
             uri ?: return@registerForActivityResult
@@ -85,7 +97,9 @@ class MainActivity : ComponentActivity() {
                         onRefreshLibrary = ::scanLibraryWithPermission,
                         onSelectFolder = ::selectFolder,
                         onOpenLibraryItem = ::openLibraryItem,
-                        onOpenHistoryItem = ::openHistoryItem
+                        onOpenHistoryItem = ::openHistoryItem,
+                        onOpenSubtitleFile = ::openSubtitleFile,
+                        onSubtitleDownloaded = ::onSubtitleDownloaded
                     )
                 }
             }
@@ -122,6 +136,16 @@ class MainActivity : ComponentActivity() {
 
     private fun openMediaPicker() {
         openMediaLauncher.launch(arrayOf("video/*", "audio/*"))
+    }
+
+    private fun openSubtitleFile() {
+        openSubtitleLauncher.launch(arrayOf("text/*", "application/x-subrip", "text/vtt"))
+    }
+
+    private fun onSubtitleDownloaded(uri: Uri, language: String?, label: String?) {
+        mediaController?.let { controller ->
+            playbackController.addExternalSubtitle(controller, uri, language, label)
+        }
     }
 
     private fun selectFolder() {
