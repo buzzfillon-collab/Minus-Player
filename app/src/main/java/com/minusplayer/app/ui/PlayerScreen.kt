@@ -12,8 +12,14 @@ import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
 
 @Composable
-fun PlayerScreen(player: Player?, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+fun PlayerScreen(
+    player: Player?,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
         if (player == null) {
             Text("Open a video to start playback")
         } else {
@@ -28,7 +34,9 @@ fun PlayerScreen(player: Player?, modifier: Modifier = Modifier) {
                         useController = true
                     }
                 },
-                update = { it.player = player }
+                update = { view ->
+                    view.player = player
+                }
             )
         }
     }
