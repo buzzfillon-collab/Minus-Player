@@ -1,7 +1,6 @@
 package com.minusplayer.app.playback
 
 import android.content.Intent
-import android.net.Uri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -24,7 +23,11 @@ class PlaybackService : MediaSessionService() {
             .setBackBuffer(10_000, true)
             .build()
 
+        val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(this)
+            .setEnableDecoderFallback(true)
+
         player = ExoPlayer.Builder(this)
+            .setRenderersFactory(renderersFactory)
             .setLoadControl(loadControl)
             .setSeekBackIncrementMs(5_000)
             .setSeekForwardIncrementMs(5_000)
