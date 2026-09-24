@@ -41,6 +41,7 @@ fun LibraryScreen(
     filter: LibraryType? = null,
     onOpenItem: (LibraryItem) -> Unit,
     onSelectFolder: () -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val visibleItems = filter?.let { type ->
@@ -50,7 +51,7 @@ fun LibraryScreen(
     androidx.compose.material3.pulltorefresh.PullToRefreshBox(
         modifier = modifier.fillMaxSize(),
         isRefreshing = repository.isScanning,
-        onRefresh = repository::scanAll
+        onRefresh = onRefresh
     ) {
         LazyColumn(
             Modifier.fillMaxSize(),
@@ -78,7 +79,7 @@ fun LibraryScreen(
                         )
                     }
                     IconButton(
-                        onClick = repository::scanAll,
+                        onClick = onRefresh,
                         enabled = !repository.isScanning
                     ) {
                         Icon(Icons.Default.Refresh, "Rescan library")
