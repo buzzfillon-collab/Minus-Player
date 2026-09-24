@@ -51,6 +51,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import android.net.Uri
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -78,7 +79,9 @@ import kotlinx.coroutines.delay
 fun PlayerScreen(
     player: Player?,
     modifier: Modifier = Modifier,
-    onToggleFullscreen: () -> Unit = {}
+    onToggleFullscreen: () -> Unit = {},
+    onOpenSubtitleFile: () -> Unit = {},
+    onSubtitleDownloaded: (Uri, String?, String?) -> Unit = { _, _, _ -> }
 ) {
     var position by remember(player) { mutableLongStateOf(player?.currentPosition ?: 0L) }
     var duration by remember(player) { mutableLongStateOf(player?.duration ?: 0L) }
@@ -92,6 +95,7 @@ fun PlayerScreen(
     var currentTracks by remember(player) { mutableStateOf(player?.currentTracks) }
     var audioDialog by remember { mutableStateOf(false) }
     var subtitleDialog by remember { mutableStateOf(false) }
+    var onlineSubtitleDialog by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
 
@@ -311,6 +315,24 @@ fun PlayerScreen(
                         }
                     )
                 }
+                DropdownMenuItem(
+                    text = { Text("Load subtitle file") },
+                    leadingIcon = { Icon(Icons.Default.ClosedCaption, null) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenSubtitleFile()
+                        wakeControls()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Search online subtitles") },
+                    leadingIcon = { Icon(Icons.Default.ClosedCaption, null) },
+                    onClick = {
+                        menuExpanded = false
+                        onlineSubtitleDialog = true
+                        wakeControls()
+                    }
+                )
                 if (hasSubtitleTracks) {
                     DropdownMenuItem(
                         text = { Text("Subtitles") },
@@ -389,6 +411,18 @@ fun PlayerScreen(
                         .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
                         .build()
                     audioDialog = false
+                    wakeControls()
+                }
+            )
+        }
+
+        if (onlineSubtitleDialog && player != null) {
+            SubtitleSearchDialog(
+                initialQuery = player.currentMediaItem?.mediaMetadata?.title?.toString().orEmpty(),
+                onDismiss = { onlineSubtitleDialog = false },
+                onDownloaded = { uri, language, label ->
+                    onSubtitleDownloaded(uri, language, label)
+                    onlineSubtitleDialog = false
                     wakeControls()
                 }
             )
