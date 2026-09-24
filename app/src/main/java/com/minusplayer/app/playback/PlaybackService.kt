@@ -54,6 +54,13 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
+        player!!.trackSelectionParameters = player!!.trackSelectionParameters
+            .buildUpon()
+            .setPreferredAudioLanguage(DEFAULT_LANGUAGE)
+            .setPreferredTextLanguage(DEFAULT_LANGUAGE)
+            .setSelectTextByDefault(true)
+            .build()
+
         decoderManager.attach(player!!)
 
         player!!.addListener(object : Player.Listener {
@@ -135,6 +142,10 @@ class PlaybackService : MediaSessionService() {
         player?.release()
         player = null
         super.onDestroy()
+    }
+
+    companion object {
+        private const val DEFAULT_LANGUAGE = "en"
     }
 
     private fun saveResumePosition() {
