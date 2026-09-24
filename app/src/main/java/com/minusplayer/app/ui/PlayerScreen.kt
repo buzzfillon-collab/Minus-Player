@@ -11,9 +11,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -22,6 +27,8 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -32,6 +39,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,7 +66,11 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 
@@ -77,6 +89,9 @@ fun PlayerScreen(
     var interactionTick by remember { mutableIntStateOf(0) }
     var volume by remember(player) { mutableFloatStateOf(player?.volume ?: 1f) }
     var playbackError by remember(player) { mutableStateOf<androidx.media3.common.PlaybackException?>(null) }
+    var currentTracks by remember(player) { mutableStateOf(player?.currentTracks) }
+    var audioDialog by remember { mutableStateOf(false) }
+    var subtitleDialog by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
 
@@ -90,12 +105,17 @@ fun PlayerScreen(
             onDispose { }
         } else {
             val listener = object : Player.Listener {
+                override fun onTracksChanged(tracks: Tracks) {
+                    currentTracks = tracks
+                }
+
                 override fun onEvents(player: Player, events: Player.Events) {
                     position = player.currentPosition.coerceAtLeast(0L)
                     duration = player.duration.coerceAtLeast(0L)
                     bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
                     isPlaying = player.isPlaying
                     volume = player.volume
+                    currentTracks = player.currentTracks
                     if (events.contains(Player.EVENT_PLAYER_ERROR)) {
                         playbackError = player.playerError
                     } else if (player.playerError == null) {
@@ -115,6 +135,7 @@ fun PlayerScreen(
             bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
             isPlaying = player.isPlaying
             volume = player.volume
+            currentTracks = player.currentTracks
             playbackError = player.playerError
             delay(250L)
         }
@@ -130,6 +151,9 @@ fun PlayerScreen(
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
+
+    val hasAudioTracks = currentTracks?.groups?.any { it.type == C.TRACK_TYPE_AUDIO } == true
+    val hasSubtitleTracks = currentTracks?.groups?.any { it.type == C.TRACK_TYPE_TEXT } == true
 
     Box(
         modifier = modifier
@@ -276,6 +300,28 @@ fun PlayerScreen(
                         wakeControls()
                     }
                 )
+                if (hasAudioTracks) {
+                    DropdownMenuItem(
+                        text = { Text("Audio track") },
+                        leadingIcon = { Icon(Icons.Default.Audiotrack, null) },
+                        onClick = {
+                            menuExpanded = false
+                            audioDialog = true
+                            wakeControls()
+                        }
+                    )
+                }
+                if (hasSubtitleTracks) {
+                    DropdownMenuItem(
+                        text = { Text("Subtitles") },
+                        leadingIcon = { Icon(Icons.Default.ClosedCaption, null) },
+                        onClick = {
+                            menuExpanded = false
+                            subtitleDialog = true
+                            wakeControls()
+                        }
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Speed 1.0×") },
                     onClick = {
@@ -328,7 +374,150 @@ fun PlayerScreen(
                 )
             }
         }
+
+        if (audioDialog && player != null) {
+            TrackPickerDialog(
+                title = "Audio track",
+                type = C.TRACK_TYPE_AUDIO,
+                tracks = currentTracks ?: Tracks.EMPTY,
+                allowOff = false,
+                onDismiss = { audioDialog = false },
+                onSelect = { group, index ->
+                    player.trackSelectionParameters = player.trackSelectionParameters
+                        .buildUpon()
+                        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+                        .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
+                        .build()
+                    audioDialog = false
+                    wakeControls()
+                }
+            )
+        }
+
+        if (subtitleDialog && player != null) {
+            TrackPickerDialog(
+                title = "Subtitles",
+                type = C.TRACK_TYPE_TEXT,
+                tracks = currentTracks ?: Tracks.EMPTY,
+                allowOff = true,
+                onDismiss = { subtitleDialog = false },
+                onOff = {
+                    player.trackSelectionParameters = player.trackSelectionParameters
+                        .buildUpon()
+                        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                        .build()
+                    subtitleDialog = false
+                    wakeControls()
+                },
+                onSelect = { group, index ->
+                    player.trackSelectionParameters = player.trackSelectionParameters
+                        .buildUpon()
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                        .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
+                        .build()
+                    subtitleDialog = false
+                    wakeControls()
+                }
+            )
+        }
     }
+}
+
+private data class TrackChoice(
+    val group: Tracks.Group,
+    val index: Int,
+    val format: Format
+)
+
+@Composable
+private fun TrackPickerDialog(
+    title: String,
+    type: @C.TrackType Int,
+    tracks: Tracks,
+    allowOff: Boolean,
+    onDismiss: () -> Unit,
+    onOff: () -> Unit = {},
+    onSelect: (Tracks.Group, Int) -> Unit
+) {
+    val choices = buildList {
+        tracks.groups
+            .filter { it.type == type }
+            .forEach { group ->
+                for (index in 0 until group.length) {
+                    if (group.isTrackSupported(index)) {
+                        add(TrackChoice(group, index, group.getTrackFormat(index)))
+                    }
+                }
+            }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(320.dp)
+            ) {
+                if (allowOff) {
+                    item {
+                        TextButton(
+                            onClick = onOff,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Off", modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+                items(choices) { choice ->
+                    TextButton(
+                        onClick = { onSelect(choice.group, choice.index) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(
+                                trackLabel(choice.format),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2
+                            )
+                            if (choice.group.isTrackSelected(choice.index)) {
+                                Text(
+                                    "Currently selected",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+                if (choices.isEmpty()) {
+                    item { Text("No supported tracks found.") }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+private fun trackLabel(format: Format): String {
+    val language = format.language
+        ?.takeIf { it.isNotBlank() && !it.equals("und", ignoreCase = true) }
+        ?.let { "[$it] " }
+        .orEmpty()
+    val label = format.label?.takeIf { it.isNotBlank() }
+    val codec = format.sampleMimeType
+        ?.substringAfterLast('/')
+        ?.uppercase()
+    val channels = if (format.channelCount > 0) " • ${format.channelCount}ch" else ""
+    return listOfNotNull(
+        language + (label ?: codec ?: "Track"),
+        if (label != null && codec != null) codec else null
+    ).joinToString(" • ") + channels
 }
 
 @Composable
@@ -358,7 +547,7 @@ private fun PlaybackErrorOverlay(
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(Modifier.size(16.dp))
-            androidx.compose.material3.Button(onClick = onRetry) {
+            Button(onClick = onRetry) {
                 Text("Retry")
             }
         }
@@ -496,7 +685,7 @@ private fun PlayerOverlayControls(
                     Icon(Icons.Default.VolumeDown, "Volume down", tint = Color.White)
                 }
                 Text(
-                    "\${(volume * 100).toInt()}%",
+                    "${(volume * 100).toInt()}%",
                     color = Color.White,
                     style = MaterialTheme.typography.labelMedium
                 )
